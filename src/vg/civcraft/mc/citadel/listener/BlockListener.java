@@ -481,8 +481,12 @@ public class BlockListener implements Listener {
 			}
 
 			Action action = pie.getAction();
-			boolean access_reinforcement = action == Action.RIGHT_CLICK_BLOCK
+			boolean access_reinforcement = (action == Action.RIGHT_CLICK_BLOCK || action == Action.LEFT_CLICK_BLOCK)
 					&& reinforcement != null && reinforcement.isSecurable();
+			if (reinforcement != null && reinforcement.isSecurable() && !access_reinforcement) {
+				Citadel.getInstance().getLogger().log(Level.WARNING, "Access {0} involved unexpected action {1} from hand {2}",
+						new Object[] {block.getType(), action, pie.getHand()});
+			}
 			boolean normal_access_denied = reinforcement != null
 					&& ((reinforcement.isDoor() && !reinforcement
 							.canAccessDoors(player)) || (reinforcement
