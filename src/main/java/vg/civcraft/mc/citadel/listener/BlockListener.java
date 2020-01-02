@@ -7,6 +7,7 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.Openable;
 import org.bukkit.block.data.type.Comparator;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -18,14 +19,17 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.StructureGrowEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 
 import vg.civcraft.mc.citadel.Citadel;
 import vg.civcraft.mc.citadel.CitadelPermissionHandler;
 import vg.civcraft.mc.citadel.CitadelUtility;
 import vg.civcraft.mc.citadel.ReinforcementLogic;
 import vg.civcraft.mc.citadel.model.Reinforcement;
-import vg.civcraft.mc.civmodcore.api.MaterialAPI;
 import vg.civcraft.mc.civmodcore.api.BlockAPI;
+import vg.civcraft.mc.civmodcore.api.MaterialAPI;
+import vg.civcraft.mc.civmodcore.api.ToolAPI;
 
 public class BlockListener implements Listener {
 
@@ -122,7 +126,7 @@ public class BlockListener implements Listener {
 	@EventHandler(priority = EventPriority.LOW)
 	public void liquidDumpEvent(PlayerBucketEmptyEvent event) {
 		Block block = event.getBlockClicked().getRelative(event.getBlockFace());
-		if (block.getType().equals(Material.AIR) || block.getType().isSolid()) {
+		if (block.getType() == Material.AIR || block.getType().isSolid()) {
 			return;
 		}
 		Reinforcement rein = ReinforcementLogic.getReinforcementProtecting(block);
@@ -131,9 +135,12 @@ public class BlockListener implements Listener {
 		}
 	}
 
-	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOW)
+	@EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
 	public void onBlockFromToEvent(BlockFromToEvent event) {
 		// prevent water/lava from spilling reinforced blocks away
+		if (event.getToBlock().getY() < 0) {
+			return;
+		}
 		Reinforcement rein = ReinforcementLogic.getReinforcementProtecting(event.getToBlock());
 		if (rein != null) {
 			event.setCancelled(true);
@@ -205,6 +212,74 @@ public class BlockListener implements Listener {
 		Reinforcement rein = Citadel.getInstance().getReinforcementManager().getReinforcement(e.getBlock());
 		if (rein != null) {
 			rein.setHealth(-1);
+		}
+	}
+	
+	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+	public void preventStrippingLogs(PlayerInteractEvent pie) {
+		if (!pie.hasBlock()) {
+			return;
+		}
+		Block block = pie.getClickedBlock();
+		if (!MaterialAPI.isLog(block.getType())) {
+			return;
+		}
+		EquipmentSlot hand = pie.getHand();
+		if (hand != EquipmentSlot.HAND && hand != EquipmentSlot.OFF_HAND) {
+			return;
+		}
+		ItemStack relevant;
+		Player p = pie.getPlayer();
+		if (hand == EquipmentSlot.HAND) {
+			relevant = p.getInventory().getItemInMainHand();
+		}
+		else {
+			relevant = p.getInventory().getItemInOffHand();
+		}
+		if (!ToolAPI.isAxe(relevant.getType())) {
+			return;
+		}
+		Reinforcement rein = Citadel.getInstance().getReinforcementManager().getReinforcement(block);
+		if (rein == null) {
+			return;
+		}
+		if (!rein.hasPermission(p, CitadelPermissionHandler.getModifyBlocks())) {
+			p.sendMessage(ChatColor.RED + "You do not have permission to modify this block");
+			pie.setCancelled(true);
+		}
+	}
+	
+	@EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+	public void preventTilingGrass(PlayerInteractEvent pie) {
+		if (!pie.hasBlock()) {
+			return;
+		}
+		Block block = pie.getClickedBlock();
+		if (block.getType() != Material.GRASS_BLOCK) {
+			return;
+		}
+		EquipmentSlot hand = pie.getHand();
+		if (hand != EquipmentSlot.HAND && hand != EquipmentSlot.OFF_HAND) {
+			return;
+		}
+		ItemStack relevant;
+		Player p = pie.getPlayer();
+		if (hand == EquipmentSlot.HAND) {
+			relevant = p.getInventory().getItemInMainHand();
+		}
+		else {
+			relevant = p.getInventory().getItemInOffHand();
+		}
+		if (!ToolAPI.isShovel(relevant.getType())) {
+			return;
+		}
+		Reinforcement rein = Citadel.getInstance().getReinforcementManager().getReinforcement(block);
+		if (rein == null) {
+			return;
+		}
+		if (!rein.hasPermission(p, CitadelPermissionHandler.getModifyBlocks())) {
+			p.sendMessage(ChatColor.RED + "You do not have permission to modify this block");
+			pie.setCancelled(true);
 		}
 	}
 }

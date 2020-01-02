@@ -19,20 +19,21 @@ import com.gmail.filoghost.holographicdisplays.api.HologramsAPI;
 
 import vg.civcraft.mc.citadel.Citadel;
 import vg.civcraft.mc.citadel.CitadelPermissionHandler;
-import vg.civcraft.mc.citadel.playerstate.InformationState;
-
+import vg.civcraft.mc.citadel.listener.InformationModeListener;
 public class HologramManager {
 
 	// distance from center to diagonal corner is 0.5 * sqrt(2) and we add 10 % for
 	// good measure
-	private static final double holoOffSet = 0.55 * Math.sqrt(2);
+	private static final double HOLOOFFSET = 0.55 * Math.sqrt(2);
 
 	private Map<Location, Map<UUID, PlayerHolo>> holograms;
 	private Set<PlayerHolo> activeHolos;
+	private CitadelSettingManager settingMan;
 
-	public HologramManager() {
+	public HologramManager(CitadelSettingManager settingMan) {
 		this.holograms = new HashMap<>();
 		this.activeHolos = new HashSet<>();
+		this.settingMan = settingMan;
 		new BukkitRunnable() {
 
 			@Override
@@ -68,7 +69,7 @@ public class HologramManager {
 		vector.normalize();
 		// holoOffSet is a good distance to ensure we fully move the hologram out of the
 		// block
-		vector.multiply(holoOffSet);
+		vector.multiply(HOLOOFFSET);
 		baseLoc.add(vector);
 		return baseLoc;
 	}
@@ -76,7 +77,7 @@ public class HologramManager {
 	private void updateHolograms() {
 		for (Iterator<PlayerHolo> iter = activeHolos.iterator(); iter.hasNext();) {
 			PlayerHolo holo = iter.next();
-			if (!holo.update(5000)) {
+			if (!holo.update()) {
 				iter.remove();
 			}
 		}
@@ -91,11 +92,13 @@ public class HologramManager {
 		private boolean hasPermission;
 		private Location cachedPlayerLocation;
 		private double cachedHealth;
+		private long cullDelay;
 
 		public PlayerHolo(Player player, Reinforcement reinforcement) {
 			this.player = player;
 			this.reinforcement = reinforcement;
 			this.timeStamp = System.currentTimeMillis();
+			this.cullDelay = settingMan.getHologramDuration(player.getUniqueId());
 			// we intentionally cache permission to avoid having to look it up often
 			// showing a bit too much information if the player gets kicked while a holo is
 			// already visible does not matter
@@ -114,7 +117,7 @@ public class HologramManager {
 			updateText();
 		}
 
-		boolean update(long cullDelay) {
+		boolean update() {
 			if (System.currentTimeMillis() - timeStamp > cullDelay) {
 				delete();
 				return false;
@@ -131,8 +134,8 @@ public class HologramManager {
 		void updateLocation() {
 			Location current = player.getLocation();
 			// Location.equals would also check pitch/yaw
-			if (current.getX() == cachedPlayerLocation.getX() && current.getY() == cachedPlayerLocation.getY()
-					&& current.getZ() == cachedPlayerLocation.getZ()) {
+			if (current.getBlockX() == cachedPlayerLocation.getBlockX() && current.getBlockY() == cachedPlayerLocation.getBlockY()
+					&& current.getBlockZ() == cachedPlayerLocation.getBlockZ()) {
 				return;
 			}
 			Location updated = getHoloLocation(reinforcement, player);
@@ -148,7 +151,7 @@ public class HologramManager {
 				if (hologram.size() > 0) {
 					hologram.removeLine(0);
 				}
-				hologram.insertTextLine(0, InformationState.formatHealth(reinforcement));
+				hologram.insertTextLine(0, InformationModeListener.formatHealth(reinforcement));
 				cachedHealth = reinforcement.getHealth();
 			}
 			if (!hasPermission) {
@@ -163,7 +166,7 @@ public class HologramManager {
 				hologram.removeLine(3);
 			}
 			if (!reinforcement.isMature()) {
-				hologram.insertTextLine(3, InformationState.formatProgress(reinforcement.getCreationTime(),
+				hologram.insertTextLine(3, InformationModeListener.formatProgress(reinforcement.getCreationTime(),
 						reinforcement.getType().getMaturationTime(), ""));
 			}
 		}

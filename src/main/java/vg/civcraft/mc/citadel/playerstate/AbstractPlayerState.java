@@ -15,6 +15,7 @@ import org.bukkit.inventory.ItemStack;
 import vg.civcraft.mc.citadel.CitadelPermissionHandler;
 import vg.civcraft.mc.citadel.CitadelUtility;
 import vg.civcraft.mc.citadel.ReinforcementLogic;
+import vg.civcraft.mc.citadel.events.ReinforcedBlockBreak;
 import vg.civcraft.mc.citadel.events.ReinforcementBypassEvent;
 import vg.civcraft.mc.citadel.events.ReinforcementDamageEvent;
 import vg.civcraft.mc.citadel.model.Reinforcement;
@@ -79,7 +80,12 @@ public abstract class AbstractPlayerState {
 			return;
 		}
 		damage = dre.getDamageDone();
-		ReinforcementLogic.damageReinforcement(rein, damage);
+		ReinforcementLogic.damageReinforcement(rein, damage, e.getPlayer());
+		if (rein.getHealth() <= 0) {
+			e.setCancelled(false);
+			ReinforcedBlockBreak rbbe = new ReinforcedBlockBreak(e.getPlayer(), rein, e);
+			Bukkit.getPluginManager().callEvent(rbbe);
+		}
 	}
 
 	public abstract void handleInteractBlock(PlayerInteractEvent e);
